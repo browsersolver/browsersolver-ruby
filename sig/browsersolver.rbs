@@ -1,0 +1,87 @@
+module BrowserSolver
+  VERSION: String
+  ENDPOINTS: Hash[String, Hash[Symbol, untyped]]
+
+  class Error < StandardError
+  end
+  class ConfigurationError < Error
+  end
+  class SerializationError < Error
+    attr_reader param: String?
+    def initialize: (String message, ?String? param) -> void
+  end
+  class TransportError < Error
+  end
+  class APIError < Error
+    attr_reader status: Integer
+    attr_reader error_message: String?
+    attr_reader response_body: untyped
+    attr_reader raw_response: RawResponse
+  end
+  class ResponseDecodingError < Error
+    attr_reader raw_response: RawResponse
+  end
+  class JobTimeoutError < Error
+    attr_reader job_id: String
+    attr_reader last_response: JsonResponse?
+  end
+
+  class RawResponse < Struct[untyped]
+    attr_accessor status: Integer
+    attr_accessor headers: Hash[String, Array[String]]
+    attr_accessor content_type: String?
+    attr_accessor body: String
+  end
+
+  class JsonResponse
+    attr_reader data: untyped
+    attr_reader raw_response: RawResponse
+    def kind: () -> :json
+    def json?: () -> true
+    def binary?: () -> false
+  end
+  class BinaryResponse
+    attr_reader bytes: String
+    attr_reader content_type: String?
+    attr_reader raw_response: RawResponse
+    def kind: () -> :binary
+    def json?: () -> false
+    def binary?: () -> true
+    def save: (String path) -> Integer
+  end
+
+  class BatchResult < Struct[untyped]
+    attr_accessor index: Integer
+    attr_accessor value: untyped
+    attr_accessor error: StandardError?
+    def ok?: () -> bool
+  end
+
+  type response = JsonResponse | BinaryResponse
+  type request_options = { ?method: String, ?timeout: Numeric?, ?headers: Hash[String, String], ?max_retries: Integer }
+
+  module Operations
+    def jobs: (id: String, ?request_options: request_options?) -> JsonResponse
+    def stats: (?engine: String, ?path: String, ?request_options: request_options?) -> JsonResponse
+    def usage: (?request_options: request_options?) -> JsonResponse
+    def website_antibot: (query: String, ?timeout: Numeric, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> JsonResponse
+    def website_crawler: (query: String, ?allow_redirects: bool, ?return_page_source: bool, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> JsonResponse
+    def website_rendering: (query: String, ?wait_in_seconds: Numeric, ?wait_for: String, ?block_ads: bool, ?timeout: Numeric, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> JsonResponse
+    def website_screenshot: (url: String, ?format: String, ?device: String, ?full_page: bool, ?full_page_scroll: bool, ?full_page_scroll_duration: Numeric, ?viewport_width: Numeric, ?viewport_height: Numeric, ?scale_factor: Numeric, ?image_quality: String, ?selector: String, ?cache: bool, ?cache_ttl: Numeric, ?remove_selectors: String, ?remove_cookie_banners: bool, ?remove_ads: bool, ?block_resources: String, ?block_urls: String, ?delay: Numeric, ?wait_until: Array[untyped], ?wait_for_selector: String, ?proxy: String, ?s3_secret_key: String, ?s3_access_key_id: String, ?s3_bucket: String, ?s3_object_key: String, ?s3_region: String, ?storage_endpoint: String, ?s3_url: bool, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> response
+    def website_technology: (query: String, ?mode: String, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> JsonResponse
+    def website_webunlocker: (query: String, ?allow_redirects: bool, ?return_page_source: bool, ?fields: String, ?is_async: bool, ?soft_fail: bool, ?request_options: request_options?) -> JsonResponse
+  end
+
+  class Client
+    include Operations
+    DEFAULT_CONCURRENCY: Integer
+    MAX_RETRIES: Integer
+    RETRY_BACKOFF_FACTOR: Float
+    DEFAULT_RETRY_DELAY: Float
+    DEFAULT_TIMEOUT: Integer
+    def initialize: (?api_key: String?, ?base_url: String, ?timeout: Numeric?, ?headers: Hash[untyped, untyped], ?max_retries: Integer, ?retry_delay: Numeric, ?transport: untyped) -> void
+    def request: (String | Symbol method, String path, ?Hash[untyped, untyped]? params, ?timeout: Numeric?, ?headers: Hash[untyped, untyped]?, ?max_retries: Integer?) -> response
+    def batch: [I, T] (Enumerable[I] items, ?concurrency: Integer) { (I item) -> T } -> Array[BatchResult]
+    def wait_for_job: (String job_id, ?interval: Numeric, ?timeout: Numeric) ?{ (untyped job) -> void } -> JsonResponse
+  end
+end
